@@ -42,13 +42,13 @@ class ControlMission(Node):
         with open(green_light_path, 'r') as glm:
             self.green_light_model = glm.read().replace("\n", "")
 
-        # traffic_left_path = model_dir_path + '/traffic_left/model.sdf'
-        # traffic_left_model = open(traffic_left_path, 'r')
-        # self.traffic_left_model = traffic_left_model.read()
+        traffic_left_path = model_dir_path + '/intersection/left.sdf'
+        with open(traffic_left_path, 'r') as tlm:
+            self.traffic_left_model = tlm.read().replace("\n", "")
 
-        # traffic_right_path = model_dir_path + '/traffic_right/model.sdf'
-        # traffic_right_model = open(traffic_right_path, 'r')
-        # self.traffic_right_model = traffic_right_model.read()
+        traffic_right_path = model_dir_path + '/intersection/right.sdf'
+        with open(traffic_right_path, 'r') as trm:
+            self.traffic_right_model = trm.read().replace("\n", "")
 
         # up_bar_path = model_dir_path + '/traffic_bar_up/model.sdf'
         # up_bar_model = open(up_bar_path, 'r')
@@ -148,19 +148,28 @@ class ControlMission(Node):
                     p = subprocess.run(arg)
                     self.traffic_state = 4
 
-            # elif self.traffic_state == 4:
-            #     if abs(self.current_time - time.time()) > 5:  # intersections
-            #         rospy.wait_for_service('gazebo/spawn_sdf_model')
-            #         del_model_prox = rospy.ServiceProxy('gazebo/delete_model', DeleteModel)
-            #         intersection_direction = np.random.rand()
+            elif self.traffic_state == 4: # intersections
+                intersection_direction = random.random()
 
-            #         if intersection_direction < 0.5:
-            #             del_model_prox('traffic_right')
+                if intersection_direction < 0.5:
+                    command = ["gz", "service", "-s", "/world/course/create",
+                    "--reqtype", "gz.msgs.EntityFactory",
+                    "--reptype", "gz.msgs.Boolean",
+                    "--timeout", "300",
+                    "--req", f'sdf: "{self.traffic_left_model}"']
 
-            #         else:
-            #             del_model_prox('traffic_left')
+                    p = subprocess.run(command)
 
-            #         self.traffic_state = 5
+                else:
+                    command = ["gz", "service", "-s", "/world/course/create",
+                    "--reqtype", "gz.msgs.EntityFactory",
+                    "--reptype", "gz.msgs.Boolean",
+                    "--timeout", "300",
+                    "--req", f'sdf: "{self.traffic_right_model}"']
+
+                    p = subprocess.run(command)
+
+                self.traffic_state = 5
 
             # elif self.traffic_state == 6:  # bar down.
             #     rospy.wait_for_service('gazebo/spawn_sdf_model')

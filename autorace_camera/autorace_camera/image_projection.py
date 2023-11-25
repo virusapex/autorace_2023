@@ -37,13 +37,14 @@ class ImageProjection(Node):
             # publishes ground-project image in raw type 
             self.pub_image_projected = self.create_publisher(Image, '/color/image_output', 1)
 
-        # if self.calib == True:
-        #     if self.pub_image_type == "compressed":
-        #         # publishes calibration image in compressed type 
-        #         self.pub_image_calib = self.create_publisher(CompressedImage, '/color/image_calib/compressed', 1)
-        #     elif self.pub_image_type == "raw":
-        #         # publishes calibration image in raw type 
-        #         self.pub_image_calib = self.create_publisher(Image, '/color/image_calib', 1)
+        self.calib = self.get_parameter("is_calibrating").get_parameter_value().bool_value
+        if self.calib == True:
+            if self.pub_image_type == "compressed":
+                # publishes calibration image in compressed type 
+                self.pub_image_calib = self.create_publisher(CompressedImage, '/color/image_calib/compressed', 1)
+            elif self.pub_image_type == "raw":
+                # publishes calibration image in raw type 
+                self.pub_image_calib = self.create_publisher(Image, '/color/image_calib', 1)
 
         self.cvBridge = CvBridge()
 
@@ -52,7 +53,6 @@ class ImageProjection(Node):
         self.top_y = self.get_parameter("top_y").get_parameter_value().integer_value
         self.bottom_x = self.get_parameter("bottom_x").get_parameter_value().integer_value
         self.bottom_y = self.get_parameter("bottom_y").get_parameter_value().integer_value
-        self.calib = self.get_parameter("is_calibrating").get_parameter_value().bool_value
 
         if self.sub_image_type == "compressed":
             # converts compressed image to opencv image
@@ -73,10 +73,10 @@ class ImageProjection(Node):
             cv_image_calib = np.copy(cv_image_original)
 
             # draw lines to help setting homography variables
-            cv_image_calib = cv2.line(cv_image_calib, (160 - top_x, 180 - top_y), (160 + top_x, 180 - top_y), (0, 0, 255), 1)
-            cv_image_calib = cv2.line(cv_image_calib, (160 - bottom_x, 120 + bottom_y), (160 + bottom_x, 120 + bottom_y), (0, 0, 255), 1)
-            cv_image_calib = cv2.line(cv_image_calib, (160 + bottom_x, 120 + bottom_y), (160 + top_x, 180 - top_y), (0, 0, 255), 1)
-            cv_image_calib = cv2.line(cv_image_calib, (160 - bottom_x, 120 + bottom_y), (160 - top_x, 180 - top_y), (0, 0, 255), 1)
+            cv_image_calib = cv2.line(cv_image_calib, (424 - top_x, 240 - top_y), (424 + top_x, 240 - top_y), (0, 0, 255), 1)
+            cv_image_calib = cv2.line(cv_image_calib, (424 - bottom_x, 240 + bottom_y), (424 + bottom_x, 240 + bottom_y), (0, 0, 255), 1)
+            cv_image_calib = cv2.line(cv_image_calib, (424 + bottom_x, 240 + bottom_y), (424 + top_x, 240 - top_y), (0, 0, 255), 1)
+            cv_image_calib = cv2.line(cv_image_calib, (424 - bottom_x, 240 + bottom_y), (424 - top_x, 240 - top_y), (0, 0, 255), 1)
 
             if self.pub_image_type == "compressed":
                 # publishes calibration image in compressed type
@@ -91,23 +91,23 @@ class ImageProjection(Node):
 
         ## homography transform process
         # selecting 4 points from the original image
-        pts_src = np.array([[160 - top_x, 180 - top_y], [160 + top_x, 180 - top_y], [160 + bottom_x, 120 + bottom_y], [160 - bottom_x, 120 + bottom_y]])
+        pts_src = np.array([[424 - top_x, 240 - top_y], [424 + top_x, 240 - top_y], [424 + bottom_x, 240 + bottom_y], [424 - bottom_x, 240 + bottom_y]])
 
         # selecting 4 points from image that will be transformed
-        pts_dst = np.array([[200, 0], [800, 0], [800, 600], [200, 600]])
+        pts_dst = np.array([[148, 0], [600, 0], [600, 480], [148, 480]])
 
         # finding homography matrix
         h, status = cv2.findHomography(pts_src, pts_dst)
 
         # homography process
-        cv_image_homography = cv2.warpPerspective(cv_image_original, h, (1000, 600))
+        cv_image_homography = cv2.warpPerspective(cv_image_original, h, (848, 480))
 
         # fill the empty space with black triangles on left and right side of bottom
-        triangle1 = np.array([[0, 599], [0, 340], [200, 599]], np.int32)
-        triangle2 = np.array([[999, 599], [999, 340], [799, 599]], np.int32)
-        black = (0, 0, 0)
-        white = (255, 255, 255)
-        cv_image_homography = cv2.fillPoly(cv_image_homography, [triangle1, triangle2], black)
+        # triangle1 = np.array([[0, 479], [0, 260], [148, 479]], np.int32)
+        # triangle2 = np.array([[847, 479], [847, 260], [647, 479]], np.int32)
+        # black = (0, 0, 0)
+        # white = (255, 255, 255)
+        # cv_image_homography = cv2.fillPoly(cv_image_homography, [triangle1, triangle2], black)
 
         if self.pub_image_type == "compressed":
             # publishes ground-project image in compressed type

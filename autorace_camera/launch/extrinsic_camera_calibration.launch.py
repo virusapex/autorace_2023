@@ -12,11 +12,7 @@ from launch_ros.actions import SetParameter
 
 def generate_launch_description():
     
-    args = DeclareLaunchArgument('is_calibrating', default_value='False')
-    
-    mode = DeclareLaunchArgument(
-      "mode", default_value=TextSubstitution(text="action")
-      )
+    args = DeclareLaunchArgument('is_calibrating', default_value='True')
     
     config_comp = os.path.join(
       get_package_share_directory('autorace_camera'),
