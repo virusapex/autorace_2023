@@ -3,13 +3,12 @@ from rclpy.node import Node
 import subprocess, random
 import time, os
 from nav_msgs.msg import Odometry
-import xml.etree.ElementTree as ET
 
 
 class ControlMission(Node):
     def __init__(self):
         super().__init__('mission_control')
-        self.sub_odom = self.create_subscription(Odometry, '/robot/odom', self.getOdom, 1)
+        self.sub_odom = self.create_subscription(Odometry, '/odom', self.getOdom, 1)
         self.traffic_state = 1
         self.loadMissionModel()
         self.setTraffic()
@@ -18,9 +17,10 @@ class ControlMission(Node):
     def getOdom(self, msg):
         pose_x = msg.pose.pose.position.x
         pose_y = msg.pose.pose.position.y
+        # self.get_logger().info(f'Current pose: {pose_x, pose_y}\n {self.traffic_state}')
 
         # down_bar
-        if abs(pose_x + 1.4) < 0.15 and abs(pose_y - 1.25) < 0.05 and self.traffic_state == 5:
+        if -2.1 < pose_x < -1.85 and 2.85 < pose_y < 3.05 and self.traffic_state == 5:
             self.traffic_state = 6
 
         # up_bar
@@ -55,14 +55,6 @@ class ControlMission(Node):
         with open(suv_path, 'r') as suv:
             self.suv_model = suv.read().replace("\n", "")
 
-        # up_bar_path = model_dir_path + '/traffic_bar_up/model.sdf'
-        # up_bar_model = open(up_bar_path, 'r')
-        # self.up_bar_model = up_bar_model.read()
-
-        # down_bar_path = model_dir_path + '/traffic_bar_down/model.sdf'
-        # down_bar_model = open(down_bar_path, 'r')
-        # self.down_bar_model = down_bar_model.read()
-
     def setTraffic(self):
         
         # Find the specific element and change its values
@@ -81,105 +73,92 @@ class ControlMission(Node):
         p = subprocess.run(command)
 
     def controlMission(self):
-        while rclpy.ok():
-            if self.traffic_state == 1:  # turn on red light
-                
+        
+        if self.traffic_state == 1:  # turn on red light
+            
+            command = ["gz", "service", "-s", "/world/course/create",
+                "--reqtype", "gz.msgs.EntityFactory",
+                "--reptype", "gz.msgs.Boolean",
+                "--timeout", "300",
+                "--req", f'sdf: "{self.red_light_model}"']
+
+            p = subprocess.run(command)
+            self.traffic_state = 2
+            self.current_time = time.time()
+
+        elif self.traffic_state == 2:
+            if abs(self.current_time - time.time()) > random.uniform(1, 3):  # turn on yellow light after 1-3s.
                 command = ["gz", "service", "-s", "/world/course/create",
-                    "--reqtype", "gz.msgs.EntityFactory",
-                    "--reptype", "gz.msgs.Boolean",
-                    "--timeout", "300",
-                    "--req", f'sdf: "{self.red_light_model}"']
+                "--reqtype", "gz.msgs.EntityFactory",
+                "--reptype", "gz.msgs.Boolean",
+                "--timeout", "300",
+                "--req", f'sdf: "{self.yellow_light_model}"']
 
                 p = subprocess.run(command)
-                self.traffic_state = 2
+
+                arg = ["gz", "service", "-s", "/world/course/remove",
+                "--reqtype", "gz.msgs.Entity",
+                "--reptype", "gz.msgs.Boolean",
+                "--timeout", "300",
+                "--req", 'name: "traffic_light_red" type: MODEL']
+
+                p = subprocess.run(arg)
+                self.traffic_state = 3
                 self.current_time = time.time()
 
-            elif self.traffic_state == 2:
-                if abs(self.current_time - time.time()) > random.uniform(1, 3):  # turn on yellow light after 1-3s.
-                    command = ["gz", "service", "-s", "/world/course/create",
-                    "--reqtype", "gz.msgs.EntityFactory",
-                    "--reptype", "gz.msgs.Boolean",
-                    "--timeout", "300",
-                    "--req", f'sdf: "{self.yellow_light_model}"']
+        elif self.traffic_state == 3:
+            if abs(self.current_time - time.time()) > random.uniform(4, 7):  # turn on green light after 4-7s.
+                command = ["gz", "service", "-s", "/world/course/create",
+                "--reqtype", "gz.msgs.EntityFactory",
+                "--reptype", "gz.msgs.Boolean",
+                "--timeout", "300",
+                "--req", f'sdf: "{self.green_light_model}"']
 
-                    p = subprocess.run(command)
+                p = subprocess.run(command)
 
-                    arg = ["gz", "service", "-s", "/world/course/remove",
-                    "--reqtype", "gz.msgs.Entity",
-                    "--reptype", "gz.msgs.Boolean",
-                    "--timeout", "300",
-                    "--req", 'name: "traffic_light_red" type: MODEL']
+                arg = ["gz", "service", "-s", "/world/course/remove",
+                "--reqtype", "gz.msgs.Entity",
+                "--reptype", "gz.msgs.Boolean",
+                "--timeout", "300",
+                "--req", 'name: "traffic_light_yellow" type: MODEL']
 
-                    p = subprocess.run(arg)
-                    self.traffic_state = 3
-                    self.current_time = time.time()
+                p = subprocess.run(arg)
+                self.traffic_state = 4
 
-            elif self.traffic_state == 3:
-                if abs(self.current_time - time.time()) > random.uniform(4, 7):  # turn on green light after 4-7s.
-                    command = ["gz", "service", "-s", "/world/course/create",
-                    "--reqtype", "gz.msgs.EntityFactory",
-                    "--reptype", "gz.msgs.Boolean",
-                    "--timeout", "300",
-                    "--req", f'sdf: "{self.green_light_model}"']
+        elif self.traffic_state == 4: # intersections
+            intersection_direction = random.random()
 
-                    p = subprocess.run(command)
+            if intersection_direction < 0.5:
+                command = ["gz", "service", "-s", "/world/course/create",
+                "--reqtype", "gz.msgs.EntityFactory",
+                "--reptype", "gz.msgs.Boolean",
+                "--timeout", "300",
+                "--req", f'sdf: "{self.traffic_left_model}"']
 
-                    arg = ["gz", "service", "-s", "/world/course/remove",
-                    "--reqtype", "gz.msgs.Entity",
-                    "--reptype", "gz.msgs.Boolean",
-                    "--timeout", "300",
-                    "--req", 'name: "traffic_light_yellow" type: MODEL']
+                p = subprocess.run(command)
 
-                    p = subprocess.run(arg)
-                    self.traffic_state = 4
+            else:
+                command = ["gz", "service", "-s", "/world/course/create",
+                "--reqtype", "gz.msgs.EntityFactory",
+                "--reptype", "gz.msgs.Boolean",
+                "--timeout", "300",
+                "--req", f'sdf: "{self.traffic_right_model}"']
 
-            elif self.traffic_state == 4: # intersections
-                intersection_direction = random.random()
+                p = subprocess.run(command)
 
-                if intersection_direction < 0.5:
-                    command = ["gz", "service", "-s", "/world/course/create",
-                    "--reqtype", "gz.msgs.EntityFactory",
-                    "--reptype", "gz.msgs.Boolean",
-                    "--timeout", "300",
-                    "--req", f'sdf: "{self.traffic_left_model}"']
-
-                    p = subprocess.run(command)
-
-                else:
-                    command = ["gz", "service", "-s", "/world/course/create",
-                    "--reqtype", "gz.msgs.EntityFactory",
-                    "--reptype", "gz.msgs.Boolean",
-                    "--timeout", "300",
-                    "--req", f'sdf: "{self.traffic_right_model}"']
-
-                    p = subprocess.run(command)
-
-                self.traffic_state = 5
-
-            # elif self.traffic_state == 6:  # bar down.
-            #     rospy.wait_for_service('gazebo/spawn_sdf_model')
-            #     spawn_model_prox = rospy.ServiceProxy('gazebo/spawn_sdf_model', SpawnModel)
-            #     spawn_model_prox('up_bar', self.up_bar_model, "robotos_name_space",
-            #                      self.initial_pose, "world")
-            #     del_model_prox = rospy.ServiceProxy('gazebo/delete_model', DeleteModel)
-            #     del_model_prox('down_bar')
-            #     self.traffic_state = 7
-
-            # elif self.traffic_state == 8:  # bar up
-            #     if abs(self.current_time - time.time()) > 10:
-            #         rospy.wait_for_service('gazebo/spawn_sdf_model')
-            #         spawn_model_prox = rospy.ServiceProxy('gazebo/spawn_sdf_model', SpawnModel)
-            #         spawn_model_prox('down_bar', self.down_bar_model, "robotos_name_space",
-            #                          self.initial_pose, "world")
-            #         del_model_prox = rospy.ServiceProxy('gazebo/delete_model', DeleteModel)
-            #         del_model_prox('up_bar')
-            #         rospy.signal_shutdown('shutdown')
+            self.traffic_state = 5
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = ControlMission()
-    rclpy.spin(node)
+    try:
+        while rclpy.ok():
+            node.controlMission()
+            rclpy.spin_once(node)
+    except KeyboardInterrupt:
+        pass
+
     node.destroy_node()
     rclpy.shutdown()
 
